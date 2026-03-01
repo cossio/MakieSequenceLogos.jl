@@ -45,7 +45,7 @@ H = sum(-xlog2x.(p); dims=1)
 # Plot!
 
 fig = Makie.Figure()
-ax = Makie.Axis(fig[1,1]; width=500, height=200, xlabel="position", ylabel="conservation (bits)")
+ax = Makie.Axis(fig[1,1]; width=800, height=150, xlabel="position", ylabel="conservation (bits)")
 MakieSequenceLogos.seqlogo!(ax, p .* (log2(5) .- H), collect(NTs); color_scheme=:classic)
 Makie.resize_to_layout!(fig)
 fig
