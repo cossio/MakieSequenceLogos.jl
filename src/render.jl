@@ -5,7 +5,7 @@
 
 Plot a sequence logo onto an existing Makie `Axis`.
 
-`matrix` has size `(L, C)` where `L` is the number of positions and `C = length(alphabet)`.
+`matrix` has size `(q, L)` where `q = length(alphabet)` and `L` is the number of positions.
 Each entry encodes the height of the corresponding character at that position.
 
 # Keyword arguments
@@ -21,17 +21,17 @@ function seqlogo!(ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVect
                    ylabel::String = "Information content (bits)")
 
     mat = validate_matrix(matrix, alphabet)
-    L, C = size(mat)
+    q, L = size(mat)
     colors = color_scheme isa Symbol ? get_color_scheme(color_scheme) : color_scheme
 
     for pos in 1:L
-        _render_position!(ax, pos, @view(mat[pos, :]), alphabet, colors, font, sort_letters)
+        _render_position!(ax, pos, @view(mat[:, pos]), alphabet, colors, font, sort_letters)
     end
 
     ax.xlabel = "Position"
     ax.ylabel = ylabel
     ax.xticks = 1:L
-    Makie.xlims!(ax, 0.5, L + 0.5)
+    xlims!(ax, 0.5, L + 0.5)
 
     return ax
 end
@@ -45,7 +45,7 @@ function _render_position!(ax, pos, heights, alphabet, colors, font, sort_letter
     for (ci, h) in pairs
         glyph   = get_glyph(alphabet[ci]; font)
         polygon = glyph_to_polygon(glyph, pos - 0.5, y_offset, 1.0, h)
-        Makie.poly!(ax, polygon; color = get_color(alphabet[ci], colors), strokewidth = 0)
+        poly!(ax, polygon; color = get_color(alphabet[ci], colors), strokewidth = 0)
         y_offset += h
     end
 end
