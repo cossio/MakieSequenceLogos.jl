@@ -45,7 +45,7 @@ function _render_position!(ax, pos, heights, alphabet, colors, font, sort_letter
     for (ci, h) in pairs
         glyph   = get_glyph(alphabet[ci]; font)
         polygon = glyph_to_polygon(glyph, pos - 0.5, y_offset, 1.0, h)
-        poly!(ax, polygon; color = get_color(alphabet[ci], colors), strokewidth = 0)
+        Makie.poly!(ax, polygon; color = get_color(alphabet[ci], colors), strokewidth = 0)
         y_offset += h
     end
 end
