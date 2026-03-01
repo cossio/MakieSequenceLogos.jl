@@ -8,3 +8,4 @@ A package to plot [sequence logos](https://en.wikipedia.org/wiki/Sequence_logo) 
 ## Related
 
 * https://github.com/cossio/Logomaker.jl
+* https://github.com/cossio/SequenceLogos.jl
