@@ -2,7 +2,7 @@
 
 julia_version = "1.12.5"
 manifest_format = "2.0"
-project_hash = "d697669f3cf6bf8e46272f86a47b4a6c72c3a12d"
+project_hash = "e1f203d2b2269191ca916793a8fa51e48572397e"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -1331,7 +1331,7 @@ version = "0.24.8"
     DynamicQuantities = "06fc5a27-2a28-4c7c-a15d-362465fb6821"
 
 [[deps.MakieSequenceLogos]]
-deps = ["CairoMakie", "Colors", "FreeType", "FreeTypeAbstraction", "GeometryBasics", "Makie"]
+deps = ["Colors", "FreeType", "FreeTypeAbstraction", "GeometryBasics", "Makie"]
 path = "."
 uuid = "f0e20901-8604-42d3-8d47-9ff91640a2ee"
 version = "0.1.0-DEV"
