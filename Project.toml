@@ -1,6 +1,6 @@
 name = "MakieSequenceLogos"
 uuid = "f0e20901-8604-42d3-8d47-9ff91640a2ee"
-version = "0.1.0"
+version = "1.0.0"
 authors = "Jorge FdCD <jorge.fdcd@icloud.com>"
 
 [workspace]
