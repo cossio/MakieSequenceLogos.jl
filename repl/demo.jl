@@ -20,7 +20,7 @@ sequences = [
 
 fig = MakieSequenceLogos.seqlogo(sequences; alphabet_name = :dna, matrix_type = :information)
 Makie.save(joinpath(plot_dir, "dna_logo.png"), fig; px_per_unit = 2)
-@info "Saved dna_logo.png"
+@info "Saved $(joinpath(plot_dir, "dna_logo.png"))"
 
 # --- Example 2: From a custom matrix ---
 
@@ -35,4 +35,4 @@ mat = [
 
 fig2 = MakieSequenceLogos.seqlogo(mat, alphabet; color_scheme = :classic)
 Makie.save(joinpath(plot_dir, "custom_logo.png"), fig2; px_per_unit = 2)
-@info "Saved custom_logo.png"
+@info "Saved $(joinpath(plot_dir, "custom_logo.png"))"

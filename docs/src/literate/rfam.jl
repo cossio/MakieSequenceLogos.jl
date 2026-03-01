@@ -2,9 +2,7 @@
 # MakieSequenceLogos examples with RFAM
 =#
 
-import GitHub
-import PyPlot
-import MakieSequenceLogos
+import GitHub, Makie, CairoMakie, MakieSequenceLogos
 using Downloads: download
 using Statistics: mean
 using LogExpFunctions: xlogx
@@ -41,20 +39,13 @@ X = reshape(reduce(hcat, onehot.(seqs)), 5, :, length(seqs));
 # Sequence logo
 
 xlog2x(x) = xlogx(x) / log(oftype(x,2))
-logo_from_matrix(w::AbstractMatrix) = SequenceLogos.logo_from_matrix(w, collect(replace(NTs, '-' => '⊟')))
-
-function seqlogo_entropic(p::AbstractMatrix; max_ylim=true)
-    @assert size(p, 1) == 5 # nucleotides + gap
-    w = p ./ sum(p; dims=1)
-    H = sum(-xlog2x.(w); dims=1)
-    @assert all(0 .≤ H .≤ log2(5))
-    SequenceLogos.plot_sequence_logo(logo_from_matrix(w .* (log2(5) .- H)), SequenceLogos.nt_color)
-    max_ylim && PyPlot.matplotlib.pyplot.ylim((0, log2(5)))
-    PyPlot.matplotlib.pyplot.ylabel("conservation (bits)")
-    PyPlot.matplotlib.pyplot.xlabel("site")
-    return nothing
-end
+p = dropdims(mean(X; dims=3); dims=3)
+H = sum(-xlog2x.(p); dims=1)
 
 # Plot!
 
-logo_from_matrix(reshape(mean(X; dims=3), 5, 108))
+fig = Makie.Figure()
+ax = Makie.Axis(fig[1,1]; width=500, height=200, xlabel="position", ylabel="conservation (bits)")
+MakieSequenceLogos.seqlogo!(ax, p .* (log2(5) .- H), collect(NTs); color_scheme=:classic)
+Makie.resize_to_layout!(fig)
+fig
