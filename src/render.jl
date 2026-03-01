@@ -14,12 +14,13 @@ Each entry encodes the height of the corresponding character at that position.
 - `sort_letters`: stack letters bottom-to-top by ascending height (default `true`).
 - `ylabel`: y-axis label (default `"Information content (bits)"`).
 """
-function seqlogo!(ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVector{Char};
-                   color_scheme::Union{Symbol, Dict{Char, <:Colorant}} = :classic,
-                   font::String = _default_font_path(),
-                   sort_letters::Bool = true,
-                   ylabel::String = "Information content (bits)")
-
+function seqlogo!(
+    ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVector{Char};
+    color_scheme::Union{Symbol, Dict{Char, <:Colorant}} = :classic,
+    font::String = _default_font_path(),
+    sort_letters::Bool = true,
+    #ylabel::String = "Information content (bits)"
+)
     mat = validate_matrix(matrix, alphabet)
     q, L = size(mat)
     colors = color_scheme isa Symbol ? get_color_scheme(color_scheme) : color_scheme
@@ -28,10 +29,10 @@ function seqlogo!(ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVect
         _render_position!(ax, pos, @view(mat[:, pos]), alphabet, colors, font, sort_letters)
     end
 
-    ax.xlabel = "Position"
-    ax.ylabel = ylabel
-    ax.xticks = 1:L
-    Makie.xlims!(ax, 0.5, L + 0.5)
+    # ax.xlabel = "Position"
+    # ax.ylabel = ylabel
+    # ax.xticks = 1:L
+    # Makie.xlims!(ax, 0.5, L + 0.5)
 
     return ax
 end
