@@ -10,30 +10,28 @@ Each entry encodes the height of the corresponding character at that position.
 
 # Keyword arguments
 - `color_scheme`: a `Symbol` (`:classic`, `:dna`, `:protein`, …) or `Dict{Char, <:Colorant}`.
-- `font`: font name passed to `FreeTypeAbstraction.findfont`. Default `"dejavu sans bold"`.
+- `font`: path to a `.ttf` / `.otf` file.  Default: NotoSans-Bold bundled with Makie.
 - `sort_letters`: stack letters bottom-to-top by ascending height (default `true`).
 - `ylabel`: y-axis label (default `"Information content (bits)"`).
 """
-function seqlogo!(
-    ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVector{Char};
-    color_scheme::Union{Symbol, Dict{Char, <:Colorant}} = :classic,
-    font::String = "dejavu sans bold",
-    sort_letters::Bool = true,
-    ylabel::String = "Information content (bits)"
-)
+function seqlogo!(ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVector{Char};
+                   color_scheme::Union{Symbol, Dict{Char, <:Colorant}} = :classic,
+                   font::String = _default_font_path(),
+                   sort_letters::Bool = true,
+                   ylabel::String = "Information content (bits)")
 
     mat = validate_matrix(matrix, alphabet)
     L, C = size(mat)
     colors = color_scheme isa Symbol ? get_color_scheme(color_scheme) : color_scheme
 
-    for pos = 1:L
+    for pos in 1:L
         _render_position!(ax, pos, @view(mat[pos, :]), alphabet, colors, font, sort_letters)
     end
 
     ax.xlabel = "Position"
     ax.ylabel = ylabel
     ax.xticks = 1:L
-    Makie.xlims!(ax, 0.5, L + 0.5)
+    xlims!(ax, 0.5, L + 0.5)
 
     return ax
 end
@@ -44,8 +42,8 @@ function _render_position!(ax, pos, heights, alphabet, colors, font, sort_letter
     sort_letters && sort!(pairs; by = last)
 
     y_offset = 0.0
-    for (ci, h) = pairs
-        glyph   = get_glyph(alphabet[ci]; font_name = font)
+    for (ci, h) in pairs
+        glyph   = get_glyph(alphabet[ci]; font)
         polygon = glyph_to_polygon(glyph, pos - 0.5, y_offset, 1.0, h)
         poly!(ax, polygon; color = get_color(alphabet[ci], colors), strokewidth = 0)
         y_offset += h
@@ -59,12 +57,10 @@ end
 
 Create a new `Figure`, plot the sequence logo, and return it.
 """
-function seqlogo(
-    matrix::AbstractMatrix, alphabet::AbstractVector{Char};
-    figsize::Tuple{Int,Int} = (800, 300), kwargs...
-)
-    fig = Makie.Figure(; size = figsize)
-    ax  = Makie.Axis(fig[1, 1])
+function seqlogo(matrix::AbstractMatrix, alphabet::AbstractVector{Char};
+                  figsize::Tuple{Int,Int} = (800, 300), kwargs...)
+    fig = Figure(; size = figsize)
+    ax  = Axis(fig[1, 1])
     seqlogo!(ax, matrix, alphabet; kwargs...)
     return fig
 end
@@ -82,12 +78,11 @@ Build a matrix from aligned `sequences` and plot a sequence logo.
 - Other keyword arguments are forwarded to `seqlogo!`.
 """
 function seqlogo(sequences::Vector{String};
-    alphabet_name::Symbol = :dna,
-    matrix_type::Symbol = :information,
-    pseudocount::Float64 = 0.0,
-    background::Union{Nothing, Vector{Float64}} = nothing,
-    kwargs...
-)
+                  alphabet_name::Symbol = :dna,
+                  matrix_type::Symbol = :information,
+                  pseudocount::Float64 = 0.0,
+                  background::Union{Nothing, Vector{Float64}} = nothing,
+                  kwargs...)
     alpha = get_alphabet(alphabet_name)
 
     mat = if matrix_type === :information

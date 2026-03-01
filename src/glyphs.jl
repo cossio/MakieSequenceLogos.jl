@@ -104,80 +104,76 @@ end
 
 Walk one closed contour and convert it to a dense polyline, approximating
 any quadratic / cubic Bézier arcs with short line segments.
+
+Uses a two-phase approach for robustness:
+1. **Expand** — make implicit on-curve midpoints between consecutive conic
+   control points explicit, producing a clean point+tag list.
+2. **Linearise** — rotate so the list starts with an ON point, append the
+   starting point at the end for closure, then walk linearly consuming
+   ON / CONIC+ON / CUBIC+CUBIC+ON segments.
 """
 function _interpret_contour(pts::AbstractVector{Point2f}, tags::AbstractVector{UInt8})
     n = length(pts)
     n < 2 && return Point2f[]
 
-    result = Point2f[]
-    # Circular index helper (1-based)
-    ci(i) = mod1(i, n)
-
-    # --- find a starting on-curve point ---
-    first_on = findfirst(==(UInt8(_TAG_ON)), tags)
-
-    if first_on !== nothing
-        push!(result, pts[first_on])
-    else
-        # Entire contour is conic off-curve ⇒ start at implicit midpoint
-        push!(result, (pts[n] + pts[1]) / 2)
-        first_on = 1                       # start processing from index 1
+    # ── Phase 1: expand implicit midpoints ────────────────────────────
+    exp_pts  = Point2f[]
+    exp_tags = UInt8[]
+    for i in 1:n
+        push!(exp_pts,  pts[i])
+        push!(exp_tags, tags[i])
+        next_i = mod1(i + 1, n)
+        if tags[i] == _TAG_CONIC && tags[next_i] == _TAG_CONIC
+            push!(exp_pts,  (pts[i] + pts[next_i]) / 2)
+            push!(exp_tags, _TAG_ON)
+        end
     end
 
-    # --- walk around the contour ---
-    i = first_on + 1
-    steps = 0                              # safety guard (≤ 2n is generous)
-    while steps < 2n
-        idx = ci(i)
-        # If we've come back to the start, we're done
-        if idx == first_on && steps > 0
-            break
-        end
+    en = length(exp_pts)
 
-        t = tags[idx]
+    # ── Phase 2: rotate so we start at an ON point ────────────────────
+    first_on = findfirst(==(UInt8(_TAG_ON)), exp_tags)
+    if first_on === nothing
+        return Point2f[]            # degenerate — nothing to draw
+    end
+    if first_on != 1
+        exp_pts  = vcat(exp_pts[first_on:en],  exp_pts[1:first_on-1])
+        exp_tags = vcat(exp_tags[first_on:en], exp_tags[1:first_on-1])
+        en = length(exp_pts)
+    end
 
+    # Append the starting ON point so the loop naturally closes the contour
+    push!(exp_pts,  exp_pts[1])
+    push!(exp_tags, _TAG_ON)
+    total = length(exp_pts)
+
+    # ── Phase 3: walk and emit polyline ───────────────────────────────
+    result = Point2f[]
+    push!(result, exp_pts[1])
+    i = 2
+    while i <= total
+        t = exp_tags[i]
         if t == _TAG_ON
-            push!(result, pts[idx])
+            push!(result, exp_pts[i])
             i += 1
-
         elseif t == _TAG_CONIC
-            ctrl = pts[idx]
-            next_idx = ci(i + 1)
-            next_tag = tags[next_idx]
-
-            if next_tag == _TAG_ON
-                # conic arc with explicit endpoint
-                subdivide_conic!(result, result[end], ctrl, pts[next_idx])
+            if i + 1 <= total
+                subdivide_conic!(result, result[end], exp_pts[i], exp_pts[i+1])
                 i += 2
             else
-                # two consecutive conics → implicit on-curve at midpoint
-                implicit = (ctrl + pts[next_idx]) / 2
-                subdivide_conic!(result, result[end], ctrl, implicit)
-                i += 1                     # next conic will be handled next iteration
+                push!(result, exp_pts[i])    # fallback: treat as on-curve
+                i += 1
             end
-
         elseif t == _TAG_CUBIC
-            c1 = pts[idx]
-            c2 = pts[ci(i + 1)]
-            ep = pts[ci(i + 2)]
-            subdivide_cubic!(result, result[end], c1, c2, ep)
-            i += 3
-
+            if i + 2 <= total
+                subdivide_cubic!(result, result[end], exp_pts[i], exp_pts[i+1], exp_pts[i+2])
+                i += 3
+            else
+                push!(result, exp_pts[i])    # fallback
+                i += 1
+            end
         else
-            i += 1                         # skip unknown tags
-        end
-
-        steps += 1
-    end
-
-    # Close: if last segment was a conic whose target is the start point,
-    # it's already included; but if the contour ends with off-curve points
-    # that wrap around, connect back to the start.
-    if !isempty(result) && result[end] != result[1]
-        last_tag = tags[ci(first_on - 1)]  # tag of last point before start
-        if last_tag == _TAG_CONIC
-            ctrl = pts[ci(first_on - 1)]
-            subdivide_conic!(result, result[end], ctrl, result[1])
+            i += 1
         end
     end
 
@@ -255,18 +251,46 @@ function build_glyph(face::FreeTypeAbstraction.FTFont, char::Char)
     end
 end
 
+# --- Font loading ---------------------------------------------------------
+#
+# We load fonts by *file path* (not system font name) so that results are
+# identical on every OS.  The default is "NotoSans-Bold.ttf" shipped inside
+# Makie's artifact bundle — a clean sans-serif that is always available.
+
+const _FONT_FACE_CACHE = Dict{String, FreeTypeAbstraction.FTFont}()
+
+"""
+    _default_font_path() -> String
+
+Return the absolute path to the bold sans-serif font bundled with Makie.
+"""
+function _default_font_path()
+    return Makie.assetpath("fonts", "NotoSans-Bold.ttf")
+end
+
+"""
+    _load_font(path_or_name::String) -> FTFont
+
+Load a font face from a file path.  Faces are cached for reuse.
+"""
+function _load_font(path::String)
+    return get!(_FONT_FACE_CACHE, path) do
+        isfile(path) || error("Font file not found: $path")
+        FreeTypeAbstraction.FTFont(path)
+    end
+end
+
 # --- Public API ---
 
-function get_glyph(char::Char; font_name::String="dejavu sans bold")
-    key = (font_name, char)
+function get_glyph(char::Char; font::String = _default_font_path())
+    key = (font, char)
     return get!(GLYPH_CACHE, key) do
-        face = FreeTypeAbstraction.findfont(font_name)
-        face === nothing && error("Font '$font_name' not found")
+        face = _load_font(font)
         build_glyph(face, char)
     end
 end
 
-clear_glyph_cache!() = empty!(GLYPH_CACHE)
+clear_glyph_cache!() = (empty!(GLYPH_CACHE); empty!(_FONT_FACE_CACHE))
 
 function glyph_to_polygon(glyph::GlyphOutline, x::Real, y::Real, width::Real, height::Real)
     xf, yf, wf, hf = Float32(x), Float32(y), Float32(width), Float32(height)
