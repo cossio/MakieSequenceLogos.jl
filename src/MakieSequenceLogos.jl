@@ -1,12 +1,8 @@
 module MakieSequenceLogos
 
 import Makie, FreeType, FreeTypeAbstraction, GeometryBasics
-
-using Makie
 using GeometryBasics: Point2f, Polygon
 using Colors: @colorant_str, Colorant
-using FreeType
-using FreeTypeAbstraction
 using FreeType: FT_Load_Glyph, FT_LOAD_NO_SCALE, FT_LOAD_NO_BITMAP, FT_Outline_Funcs
 
 include("glyphs.jl")

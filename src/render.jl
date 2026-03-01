@@ -31,7 +31,7 @@ function seqlogo!(ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVect
     ax.xlabel = "Position"
     ax.ylabel = ylabel
     ax.xticks = 1:L
-    xlims!(ax, 0.5, L + 0.5)
+    Makie.xlims!(ax, 0.5, L + 0.5)
 
     return ax
 end
@@ -45,7 +45,7 @@ function _render_position!(ax, pos, heights, alphabet, colors, font, sort_letter
     for (ci, h) in pairs
         glyph   = get_glyph(alphabet[ci]; font)
         polygon = glyph_to_polygon(glyph, pos - 0.5, y_offset, 1.0, h)
-        poly!(ax, polygon; color = get_color(alphabet[ci], colors), strokewidth = 0)
+        Makie.poly!(ax, polygon; color = get_color(alphabet[ci], colors), strokewidth = 0)
         y_offset += h
     end
 end
@@ -59,8 +59,8 @@ Create a new `Figure`, plot the sequence logo, and return it.
 """
 function seqlogo(matrix::AbstractMatrix, alphabet::AbstractVector{Char};
                   figsize::Tuple{Int,Int} = (800, 300), kwargs...)
-    fig = Figure(; size = figsize)
-    ax  = Axis(fig[1, 1])
+    fig = Makie.Figure(; size = figsize)
+    ax  = Makie.Axis(fig[1, 1])
     seqlogo!(ax, matrix, alphabet; kwargs...)
     return fig
 end
