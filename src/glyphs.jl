@@ -1,4 +1,10 @@
 # Glyph outline extraction from FreeType fonts
+#
+# Instead of the fragile FT_Outline_Decompose callback approach (which requires
+# @cfunction + careful Ref/GC management), we directly read the FT_Outline
+# struct arrays (points, tags, contours) and interpret them ourselves.
+# This is fully portable (works on Apple Silicon, x86, …) and avoids segfaults
+# from premature GC of Ref objects or stale @cfunction pointers.
 
 struct GlyphOutline
     exterior::Vector{Point2f}
@@ -44,84 +50,167 @@ function signed_area(contour::Vector{Point2f})
     return area / 2.0f0
 end
 
-# --- FT_Outline_Decompose callback-based extraction ---
-# Pattern follows FreeType.jl test: test/runtests.jl:9-52
+# --- Direct outline reading (no FT_Outline_Decompose / no callbacks) ---
+#
+# We read the raw FT_Outline arrays (points, tags, contours) and interpret
+# them according to FreeType conventions:
+#   • FT_CURVE_TAG_ON    (0x01) — on-curve point
+#   • FT_CURVE_TAG_CONIC (0x00) — conic (quadratic) Bézier control point
+#   • FT_CURVE_TAG_CUBIC (0x02) — cubic Bézier control point
+# Two consecutive conic off-curve points have an implicit on-curve midpoint.
 
-function extract_raw_paths(face::FreeTypeAbstraction.FTFont, char::Char)
+const _TAG_ON    = UInt8(0x01)
+const _TAG_CONIC = UInt8(0x00)
+const _TAG_CUBIC = UInt8(0x02)
+
+"""
+    _load_outline_data(face, char) -> (points, tags, contour_ends)
+
+Load a glyph and copy its outline data out of FreeType while the face lock
+is held.  Returns Julia-owned arrays so no dangling pointers remain.
+"""
+function _load_outline_data(face::FreeTypeAbstraction.FTFont, char::Char)
     gi = FreeTypeAbstraction.glyph_index(face, char)
 
-    paths = Any[]
-
-    function _pos(p::Ptr{FreeType.FT_Vector})
-        v = unsafe_load(p)
-        (Float32(v.x), Float32(v.y))
-    end
-
-    move_to(to, user)          = (push!(paths, (:move, _pos(to)));                       Cint(0))
-    line_to(to, user)          = (push!(paths, (:line, _pos(to)));                       Cint(0))
-    conic_to(ctrl, to, user)   = (push!(paths, (:conic, _pos(ctrl), _pos(to)));          Cint(0))
-    cubic_to(c1, c2, to, user) = (push!(paths, (:cubic, _pos(c1), _pos(c2), _pos(to))); Cint(0))
-
-    move_f  = @cfunction($move_to,  Cint, (Ptr{FreeType.FT_Vector}, Ptr{Cvoid}))
-    line_f  = @cfunction($line_to,  Cint, (Ptr{FreeType.FT_Vector}, Ptr{Cvoid}))
-    conic_f = @cfunction($conic_to, Cint, (Ptr{FreeType.FT_Vector}, Ptr{FreeType.FT_Vector}, Ptr{Cvoid}))
-    cubic_f = @cfunction($cubic_to, Cint, (Ptr{FreeType.FT_Vector}, Ptr{FreeType.FT_Vector}, Ptr{FreeType.FT_Vector}, Ptr{Cvoid}))
-
     @lock getfield(face, :lock) begin
-        err = FreeType.FT_Load_Glyph(face, UInt32(gi), FreeType.FT_LOAD_NO_SCALE | FreeType.FT_LOAD_NO_BITMAP)
+        err = FT_Load_Glyph(face, UInt32(gi), FT_LOAD_NO_SCALE | FT_LOAD_NO_BITMAP)
         err != 0 && error("Could not load glyph for '$char': FreeType error $err")
 
-        GC.@preserve move_f line_f conic_f cubic_f begin
-            facerec  = unsafe_load(getfield(face, :ft_ptr))
-            glyphrec = unsafe_load(facerec.glyph)
-            outline  = glyphrec.outline
+        facerec  = unsafe_load(getfield(face, :ft_ptr))
+        glyphrec = unsafe_load(facerec.glyph)
+        outline  = glyphrec.outline
 
-            outline_funcs = FreeType.FT_Outline_Funcs(
-                Base.unsafe_convert.(Ptr{Cvoid}, (move_f, line_f, conic_f, cubic_f))...,
-                Cint(0), FT_Pos(0),
-            )
+        nc = Int(outline.n_contours)
+        np = Int(outline.n_points)
 
-            FreeType.FT_Outline_Decompose(
-                pointer_from_objref.((Ref(outline), Ref(outline_funcs)))...,
-                C_NULL,
-            )
+        if nc == 0 || np == 0
+            return Point2f[], UInt8[], Int[]
         end
-    end
 
-    return paths
+        # Copy everything into Julia arrays before releasing the lock
+        raw_pts  = [unsafe_load(outline.points, i) for i in 1:np]
+        raw_tags = [unsafe_load(Ptr{UInt8}(outline.tags), i) for i in 1:np]
+        raw_ends = [Int(unsafe_load(outline.contours, i)) for i in 1:nc]
+
+        points = [Point2f(Float32(v.x), Float32(v.y)) for v in raw_pts]
+        tags   = [t & 0x03 for t in raw_tags]   # keep only curve-tag bits
+
+        return points, tags, raw_ends            # raw_ends are 0-indexed
+    end
 end
 
-# --- Convert raw path commands to polygon contours ---
+"""
+    _interpret_contour(pts, tags) -> Vector{Point2f}
 
-function paths_to_contours(paths::Vector)
-    contours = Vector{Vector{GeometryBasics.Point2f}}()
-    current = GeometryBasics.Point2f[]
+Walk one closed contour and convert it to a dense polyline, approximating
+any quadratic / cubic Bézier arcs with short line segments.
+"""
+function _interpret_contour(pts::AbstractVector{Point2f}, tags::AbstractVector{UInt8})
+    n = length(pts)
+    n < 2 && return Point2f[]
 
-    for cmd in paths
-        tag = cmd[1]
-        if tag === :move
-            !isempty(current) && push!(contours, current)
-            current = [GeometryBasics.Point2f(cmd[2]...)]
-        elseif tag === :line
-            push!(current, GeometryBasics.Point2f(cmd[2]...))
-        elseif tag === :conic
-            p0 = current[end]
-            subdivide_conic!(current, p0, GeometryBasics.Point2f(cmd[2]...), GeometryBasics.Point2f(cmd[3]...))
-        elseif tag === :cubic
-            p0 = current[end]
-            subdivide_cubic!(current, p0, GeometryBasics.Point2f(cmd[2]...), GeometryBasics.Point2f(cmd[3]...), GeometryBasics.Point2f(cmd[4]...))
+    result = Point2f[]
+    # Circular index helper (1-based)
+    ci(i) = mod1(i, n)
+
+    # --- find a starting on-curve point ---
+    first_on = findfirst(==(UInt8(_TAG_ON)), tags)
+
+    if first_on !== nothing
+        push!(result, pts[first_on])
+    else
+        # Entire contour is conic off-curve ⇒ start at implicit midpoint
+        push!(result, (pts[n] + pts[1]) / 2)
+        first_on = 1                       # start processing from index 1
+    end
+
+    # --- walk around the contour ---
+    i = first_on + 1
+    steps = 0                              # safety guard (≤ 2n is generous)
+    while steps < 2n
+        idx = ci(i)
+        # If we've come back to the start, we're done
+        if idx == first_on && steps > 0
+            break
+        end
+
+        t = tags[idx]
+
+        if t == _TAG_ON
+            push!(result, pts[idx])
+            i += 1
+
+        elseif t == _TAG_CONIC
+            ctrl = pts[idx]
+            next_idx = ci(i + 1)
+            next_tag = tags[next_idx]
+
+            if next_tag == _TAG_ON
+                # conic arc with explicit endpoint
+                subdivide_conic!(result, result[end], ctrl, pts[next_idx])
+                i += 2
+            else
+                # two consecutive conics → implicit on-curve at midpoint
+                implicit = (ctrl + pts[next_idx]) / 2
+                subdivide_conic!(result, result[end], ctrl, implicit)
+                i += 1                     # next conic will be handled next iteration
+            end
+
+        elseif t == _TAG_CUBIC
+            c1 = pts[idx]
+            c2 = pts[ci(i + 1)]
+            ep = pts[ci(i + 2)]
+            subdivide_cubic!(result, result[end], c1, c2, ep)
+            i += 3
+
+        else
+            i += 1                         # skip unknown tags
+        end
+
+        steps += 1
+    end
+
+    # Close: if last segment was a conic whose target is the start point,
+    # it's already included; but if the contour ends with off-curve points
+    # that wrap around, connect back to the start.
+    if !isempty(result) && result[end] != result[1]
+        last_tag = tags[ci(first_on - 1)]  # tag of last point before start
+        if last_tag == _TAG_CONIC
+            ctrl = pts[ci(first_on - 1)]
+            subdivide_conic!(result, result[end], ctrl, result[1])
         end
     end
-    !isempty(current) && push!(contours, current)
 
+    return result
+end
+
+# --- Build contour list from outline data ---
+
+function extract_contours(face::FreeTypeAbstraction.FTFont, char::Char)
+    points, tags, contour_ends = _load_outline_data(face, char)
+    isempty(points) && return Vector{Vector{Point2f}}()
+
+    contours = Vector{Vector{Point2f}}()
+    start = 1                               # 1-indexed start of current contour
+    for ce in contour_ends
+        last = ce + 1                       # convert 0-indexed end → 1-indexed
+        n = last - start + 1
+        if n >= 2
+            poly = _interpret_contour(
+                @view(points[start:last]),
+                @view(tags[start:last]),
+            )
+            !isempty(poly) && push!(contours, poly)
+        end
+        start = last + 1
+    end
     return contours
 end
 
 # --- Build a normalized GlyphOutline from a font face and character ---
 
 function build_glyph(face::FreeTypeAbstraction.FTFont, char::Char)
-    paths = extract_raw_paths(face, char)
-    contours = paths_to_contours(paths)
+    contours = extract_contours(face, char)
     isempty(contours) && error("No contours found for character '$char'")
 
     # Global bounding box across all contours
@@ -135,12 +224,12 @@ function build_glyph(face::FreeTypeAbstraction.FTFont, char::Char)
 
     # Normalize every contour to [0,1] x [0,1]
     for c in contours, i in eachindex(c)
-        c[i] = GeometryBasics.Point2f((c[i][1] - xmin) / w, (c[i][2] - ymin) / h)
+        c[i] = Point2f((c[i][1] - xmin) / w, (c[i][2] - ymin) / h)
     end
 
     # Classify: positive signed area → exterior (CCW), negative → hole (CW)
-    exteriors = Vector{GeometryBasics.Point2f}[]
-    holes     = Vector{GeometryBasics.Point2f}[]
+    exteriors = Vector{Point2f}[]
+    holes     = Vector{Point2f}[]
     for c in contours
         if signed_area(c) > 0
             push!(exteriors, c)
@@ -181,11 +270,11 @@ clear_glyph_cache!() = empty!(GLYPH_CACHE)
 
 function glyph_to_polygon(glyph::GlyphOutline, x::Real, y::Real, width::Real, height::Real)
     xf, yf, wf, hf = Float32(x), Float32(y), Float32(width), Float32(height)
-    ext = [GeometryBasics.Point2f(xf + p[1]*wf, yf + p[2]*hf) for p = glyph.exterior]
+    ext = [Point2f(xf + p[1]*wf, yf + p[2]*hf) for p in glyph.exterior]
     if isempty(glyph.interiors)
-        return GeometryBasics.Polygon(ext)
+        return Polygon(ext)
     else
-        ints = [[GeometryBasics.Point2f(xf + p[1]*wf, yf + p[2]*hf) for p = hole] for hole = glyph.interiors]
-        return GeometryBasics.Polygon(ext, ints)
+        ints = [[Point2f(xf + p[1]*wf, yf + p[2]*hf) for p in hole] for hole in glyph.interiors]
+        return Polygon(ext, ints)
     end
 end

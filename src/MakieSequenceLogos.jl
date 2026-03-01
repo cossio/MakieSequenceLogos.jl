@@ -3,7 +3,7 @@ module MakieSequenceLogos
 import Makie, FreeType, FreeTypeAbstraction, GeometryBasics
 
 using Makie
-using GeometryBasics: Point2f
+using GeometryBasics: Point2f, Polygon
 using Colors: @colorant_str, Colorant
 using FreeType
 using FreeTypeAbstraction
