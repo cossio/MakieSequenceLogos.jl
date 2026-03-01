@@ -31,7 +31,7 @@ function seqlogo!(ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVect
     ax.xlabel = "Position"
     ax.ylabel = ylabel
     ax.xticks = 1:L
-    xlims!(ax, 0.5, L + 0.5)
+    Makie.xlims!(ax, 0.5, L + 0.5)
 
     return ax
 end
