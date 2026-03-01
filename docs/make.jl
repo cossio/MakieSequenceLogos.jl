@@ -40,5 +40,5 @@ clear_md_files(literate_dir)
 
 Documenter.deploydocs(
     repo = "github.com/cossio/MakieSequenceLogos.jl.git",
-    devbranch = "master"
+    devbranch = "main"
 )
