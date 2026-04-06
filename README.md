@@ -78,7 +78,7 @@ bits = information_content(sequences, DNA_ALPHABET; pseudocount = 0.5)
 
 ## Related packages
 
-In constrast to this package, which is a "native" Julia implementation based on Makie, the following packages require Python dependencies:
+In contrast to this package, which is a "native" Julia implementation based on Makie, the following packages require Python dependencies:
 
 * https://github.com/cossio/Logomaker.jl - A thin Julia wrapper of the Logomaker Python package to plot sequence logos.
 * https://github.com/cossio/SequenceLogos.jl - Implementation based on PyPlot.
