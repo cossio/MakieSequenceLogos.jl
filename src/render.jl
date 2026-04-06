@@ -67,6 +67,10 @@ end
     seqlogo(matrix, alphabet; figsize=(800,300), kwargs...) -> Figure
 
 Create a new `Figure`, plot the sequence logo, and return it.
+
+This convenience constructor defaults `xlabel` to `"Position"`, `xticks` to
+`1:L`, and `xlimits` to `(0.5, L + 0.5)`. Pass `ylabel` explicitly when you
+want a y-axis label on matrix-based logos.
 """
 function seqlogo(matrix::AbstractMatrix, alphabet::AbstractVector{Char};
                   figsize::Tuple{Int,Int} = (800, 300),
