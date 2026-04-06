@@ -79,8 +79,8 @@ bits = information_content(sequences, DNA_ALPHABET; pseudocount = 0.5)
 
 ## API summary
 
-- `seqlogo`: render sequence logos from custom matrices or aligned sequences
-- `seqlogo!`: render sequence logos on an existing Makie axis from custom matrices
+- `seqlogo`: render sequence logos from either precomputed matrices or aligned sequences
+- `seqlogo!`: render sequence logos on an existing Makie axis from precomputed matrices only
 - `pfm`, `ppm`, `pwm`, `information_content`: build common sequence-logo matrices
 - `DNA_ALPHABET`, `RNA_ALPHABET`, `PROTEIN_ALPHABET`: built-in alphabets
 
