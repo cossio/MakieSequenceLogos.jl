@@ -64,6 +64,13 @@ save("custom_logo.png", fig)
 ```julia
 using MakieSequenceLogos
 
+sequences = [
+    "AGGCTGAT",
+    "AGGCTGAT",
+    "AGTCTGAT",
+    "AGGCAGAT",
+]
+
 counts = pfm(sequences, DNA_ALPHABET)
 probabilities = ppm(sequences, DNA_ALPHABET; pseudocount = 0.5)
 weights = pwm(sequences, DNA_ALPHABET; pseudocount = 0.5)
@@ -72,7 +79,8 @@ bits = information_content(sequences, DNA_ALPHABET; pseudocount = 0.5)
 
 ## API summary
 
-- `seqlogo` / `seqlogo!`: render sequence logos from custom matrices or aligned sequences
+- `seqlogo`: render sequence logos from custom matrices or aligned sequences
+- `seqlogo!`: render sequence logos on an existing Makie axis from custom matrices
 - `pfm`, `ppm`, `pwm`, `information_content`: build common sequence-logo matrices
 - `DNA_ALPHABET`, `RNA_ALPHABET`, `PROTEIN_ALPHABET`: built-in alphabets
 

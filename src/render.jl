@@ -12,14 +12,18 @@ Each entry encodes the height of the corresponding character at that position.
 - `color_scheme`: a `Symbol` (`:classic`, `:dna`, `:protein`, …) or `Dict{Char, <:Colorant}`.
 - `font`: path to a `.ttf` / `.otf` file.  Default: NotoSans-Bold bundled with Makie.
 - `sort_letters`: stack letters bottom-to-top by ascending height (default `true`).
-- `ylabel`: y-axis label (default `"Information content (bits)"`).
+- `xlabel`, `ylabel`, `xticks`, `xlimits`: optional axis settings. When left as
+  `nothing`, the existing axis configuration is preserved.
 """
 function seqlogo!(
     ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVector{Char};
     color_scheme::Union{Symbol, Dict{Char, <:Colorant}} = :classic,
     font::String = _default_font_path(),
     sort_letters::Bool = true,
-    ylabel::String = "Information content (bits)",
+    xlabel::Union{Nothing, String} = nothing,
+    ylabel::Union{Nothing, String} = nothing,
+    xticks = nothing,
+    xlimits = nothing,
 )
     mat = validate_matrix(matrix, alphabet)
     q, L = size(mat)
@@ -29,10 +33,10 @@ function seqlogo!(
         _render_position!(ax, pos, @view(mat[:, pos]), alphabet, colors, font, sort_letters)
     end
 
-    ax.xlabel = "Position"
-    ax.ylabel = ylabel
-    ax.xticks = 1:L
-    Makie.xlims!(ax, 0.5, L + 0.5)
+    isnothing(xlabel) || (ax.xlabel = xlabel)
+    isnothing(ylabel) || (ax.ylabel = ylabel)
+    isnothing(xticks) || (ax.xticks = xticks)
+    isnothing(xlimits) || Makie.xlims!(ax, xlimits...)
 
     return ax
 end
@@ -64,10 +68,18 @@ end
 Create a new `Figure`, plot the sequence logo, and return it.
 """
 function seqlogo(matrix::AbstractMatrix, alphabet::AbstractVector{Char};
-                  figsize::Tuple{Int,Int} = (800, 300), kwargs...)
+                  figsize::Tuple{Int,Int} = (800, 300),
+                  xlabel::Union{Nothing, String} = "Position",
+                  ylabel::Union{Nothing, String} = nothing,
+                  xticks = nothing,
+                  xlimits = nothing,
+                  kwargs...)
+    L = size(matrix, 2)
+    isnothing(xticks) && (xticks = 1:L)
+    isnothing(xlimits) && (xlimits = (0.5, L + 0.5))
     fig = Makie.Figure(; size = figsize)
     ax  = Makie.Axis(fig[1, 1])
-    seqlogo!(ax, matrix, alphabet; kwargs...)
+    seqlogo!(ax, matrix, alphabet; xlabel, ylabel, xticks, xlimits, kwargs...)
     return fig
 end
 
