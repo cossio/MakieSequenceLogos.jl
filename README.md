@@ -18,7 +18,7 @@ See the [stable documentation](https://cossio.github.io/MakieSequenceLogos.jl/st
 This package is registered. Install it with:
 
 ```julia
-import Pkg
+using Pkg
 Pkg.add("MakieSequenceLogos")
 ```
 
