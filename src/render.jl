@@ -19,7 +19,7 @@ function seqlogo!(
     color_scheme::Union{Symbol, Dict{Char, <:Colorant}} = :classic,
     font::String = _default_font_path(),
     sort_letters::Bool = true,
-    #ylabel::String = "Information content (bits)"
+    ylabel::String = "Information content (bits)",
 )
     mat = validate_matrix(matrix, alphabet)
     q, L = size(mat)
@@ -29,14 +29,19 @@ function seqlogo!(
         _render_position!(ax, pos, @view(mat[:, pos]), alphabet, colors, font, sort_letters)
     end
 
-    # ax.xlabel = "Position"
-    # ax.ylabel = ylabel
-    # ax.xticks = 1:L
-    # Makie.xlims!(ax, 0.5, L + 0.5)
+    ax.xlabel = "Position"
+    ax.ylabel = ylabel
+    ax.xticks = 1:L
+    Makie.xlims!(ax, 0.5, L + 0.5)
 
     return ax
 end
 
+"""
+    _render_position!(ax, pos, heights, alphabet, colors, font, sort_letters)
+
+Render the glyph stack for a single logo position.
+"""
 function _render_position!(ax, pos, heights, alphabet, colors, font, sort_letters)
     C = length(alphabet)
     pairs = [(i, heights[i]) for i in 1:C if heights[i] > 0]

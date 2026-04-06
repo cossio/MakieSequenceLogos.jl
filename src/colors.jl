@@ -34,9 +34,20 @@ const COLOR_SCHEMES = Dict{Symbol, Dict{Char, Colorant}}(
     :chemistry   => PROTEIN_CHEMISTRY,
 )
 
+"""
+    get_color_scheme(name) -> Dict{Char, Colorant}
+
+Return one of the built-in color schemes for sequence logos.
+"""
 function get_color_scheme(name::Symbol)
     haskey(COLOR_SCHEMES, name) && return COLOR_SCHEMES[name]
     error("Unknown color scheme: $name. Available: $(join(keys(COLOR_SCHEMES), ", "))")
 end
 
+"""
+    get_color(char, scheme) -> Colorant
+
+Look up the display color for `char`, falling back to gray when the character
+is not present in `scheme`.
+"""
 get_color(char::Char, scheme::Dict{Char, <:Colorant}) = get(scheme, char, colorant"#808080")

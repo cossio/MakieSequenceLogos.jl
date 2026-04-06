@@ -3,10 +3,32 @@
 # Convention: all matrices are q × L where q = |alphabet| and L = sequence length.
 # Each column is one position; each row is one alphabet letter.
 
+"""
+    DNA_ALPHABET
+
+Default DNA alphabet used by the logo and matrix constructors.
+"""
 const DNA_ALPHABET = ['A', 'C', 'G', 'T']
+
+"""
+    RNA_ALPHABET
+
+Default RNA alphabet used by the logo and matrix constructors.
+"""
 const RNA_ALPHABET = ['A', 'C', 'G', 'U']
+
+"""
+    PROTEIN_ALPHABET
+
+Default protein alphabet used by the logo and matrix constructors.
+"""
 const PROTEIN_ALPHABET = collect("ACDEFGHIKLMNPQRSTVWY")
 
+"""
+    get_alphabet(name) -> Vector{Char}
+
+Return the built-in alphabet for `:dna`, `:rna`, or `:protein`.
+"""
 function get_alphabet(name::Symbol)
     name === :dna && return DNA_ALPHABET
     name === :rna && return RNA_ALPHABET
