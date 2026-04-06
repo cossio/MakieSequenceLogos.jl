@@ -12,8 +12,10 @@ Each entry encodes the height of the corresponding character at that position.
 - `color_scheme`: a `Symbol` (`:classic`, `:dna`, `:protein`, …) or `Dict{Char, <:Colorant}`.
 - `font`: path to a `.ttf` / `.otf` file.  Default: NotoSans-Bold bundled with Makie.
 - `sort_letters`: stack letters bottom-to-top by ascending height (default `true`).
-- `xlabel`, `ylabel`, `xticks`, `xlimits`: optional axis settings. When left as
-  `nothing`, the existing axis configuration is preserved.
+- `xlabel`, `ylabel`: optional axis labels. When left as `nothing`, the
+  existing axis configuration is preserved.
+- `xticks`: optional tick specification passed to `ax.xticks`.
+- `xlimits`: optional `(xmin, xmax)` tuple passed to `Makie.xlims!`.
 """
 function seqlogo!(
     ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVector{Char};
