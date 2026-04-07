@@ -12,14 +12,19 @@ Each entry encodes the height of the corresponding character at that position.
 - `color_scheme`: a `Symbol` (`:classic`, `:dna`, `:protein`, …) or `Dict{Char, <:Colorant}`.
 - `font`: path to a `.ttf` / `.otf` file.  Default: NotoSans-Bold bundled with Makie.
 - `sort_letters`: stack letters bottom-to-top by ascending height (default `true`).
-- `ylabel`: y-axis label (default `"Information content (bits)"`).
+- `xlabel`, `ylabel`: optional axis labels; when left as `nothing`, the existing axis configuration is preserved.
+- `xticks`: optional tick specification passed to `ax.xticks`.
+- `xlimits`: optional `(xmin, xmax)` tuple passed to `Makie.xlims!`.
 """
 function seqlogo!(
     ax::Makie.Axis, matrix::AbstractMatrix, alphabet::AbstractVector{Char};
     color_scheme::Union{Symbol, Dict{Char, <:Colorant}} = :classic,
     font::String = _default_font_path(),
     sort_letters::Bool = true,
-    #ylabel::String = "Information content (bits)"
+    xlabel::Union{Nothing, String} = nothing,
+    ylabel::Union{Nothing, String} = nothing,
+    xticks = nothing,
+    xlimits = nothing,
 )
     mat = validate_matrix(matrix, alphabet)
     q, L = size(mat)
@@ -29,14 +34,19 @@ function seqlogo!(
         _render_position!(ax, pos, @view(mat[:, pos]), alphabet, colors, font, sort_letters)
     end
 
-    # ax.xlabel = "Position"
-    # ax.ylabel = ylabel
-    # ax.xticks = 1:L
-    # Makie.xlims!(ax, 0.5, L + 0.5)
+    isnothing(xlabel) || (ax.xlabel = xlabel)
+    isnothing(ylabel) || (ax.ylabel = ylabel)
+    isnothing(xticks) || (ax.xticks = xticks)
+    isnothing(xlimits) || Makie.xlims!(ax, xlimits...)
 
     return ax
 end
 
+"""
+    _render_position!(ax, pos, heights, alphabet, colors, font, sort_letters)
+
+Render the glyph stack for a single logo position.
+"""
 function _render_position!(ax, pos, heights, alphabet, colors, font, sort_letters)
     C = length(alphabet)
     pairs = [(i, heights[i]) for i in 1:C if heights[i] > 0]
@@ -57,12 +67,24 @@ end
     seqlogo(matrix, alphabet; figsize=(800,300), kwargs...) -> Figure
 
 Create a new `Figure`, plot the sequence logo, and return it.
+
+This convenience constructor defaults `xlabel` to `"Position"`, `xticks` to
+`1:L`, and `xlimits` to `(0.5, L + 0.5)`. Pass `ylabel` explicitly when you
+want a y-axis label on matrix-based logos.
 """
 function seqlogo(matrix::AbstractMatrix, alphabet::AbstractVector{Char};
-                  figsize::Tuple{Int,Int} = (800, 300), kwargs...)
+                  figsize::Tuple{Int,Int} = (800, 300),
+                  xlabel::Union{Nothing, String} = "Position",
+                  ylabel::Union{Nothing, String} = nothing,
+                  xticks = nothing,
+                  xlimits = nothing,
+                  kwargs...)
+    L = size(matrix, 2)
+    isnothing(xticks) && (xticks = 1:L)
+    isnothing(xlimits) && (xlimits = (0.5, L + 0.5))
     fig = Makie.Figure(; size = figsize)
     ax  = Makie.Axis(fig[1, 1])
-    seqlogo!(ax, matrix, alphabet; kwargs...)
+    seqlogo!(ax, matrix, alphabet; xlabel, ylabel, xticks, xlimits, kwargs...)
     return fig
 end
 

@@ -2,28 +2,21 @@
 # MakieSequenceLogos examples with RFAM
 =#
 
-import GitHub, Makie, CairoMakie, MakieSequenceLogos
-using Downloads: download
+import Makie, CairoMakie, MakieSequenceLogos
 using Statistics: mean
 using LogExpFunctions: xlogx
 
-# Fetch RNA family alignment RF00162 from RFAM (pre-stored as a Github Gist)
+# Sample RNA alignment inspired by an RFAM family
 
-data = GitHub.gist("b63e87024fac287a1800b1555276a04b")
-url = data.files["RF00162-trimmed.afa"]["raw_url"]
-path = download(url; timeout = Inf)
+seqs = [
+    "GGAAAUCCU",
+    "GGAAAUCCU",
+    "GGAAAUCCU",
+    "GGAAA-CCU",
+    "GGAAGUCCU",
+    "GGAAAUUCU",
+]
 nothing #hide
-
-# Parse lines
-
-seqs = String[]
-for line in eachline(path)
-    if startswith(line, '>')
-        continue
-    else
-        push!(seqs, line)
-    end
-end
 
 # RNA nucleotides
 

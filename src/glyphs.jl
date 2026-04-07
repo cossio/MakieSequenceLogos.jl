@@ -282,6 +282,11 @@ end
 
 # --- Public API ---
 
+"""
+    get_glyph(char; font=_default_font_path()) -> GlyphOutline
+
+Load and cache the normalized outline for `char` from `font`.
+"""
 function get_glyph(char::Char; font::String = _default_font_path())
     key = (font, char)
     return get!(GLYPH_CACHE, key) do
@@ -290,8 +295,19 @@ function get_glyph(char::Char; font::String = _default_font_path())
     end
 end
 
+"""
+    clear_glyph_cache!()
+
+Clear the cached glyph outlines and loaded font faces.
+"""
 clear_glyph_cache!() = (empty!(GLYPH_CACHE); empty!(_FONT_FACE_CACHE))
 
+"""
+    glyph_to_polygon(glyph, x, y, width, height) -> Polygon
+
+Transform a normalized glyph outline into a Makie polygon placed at the given
+rectangle.
+"""
 function glyph_to_polygon(glyph::GlyphOutline, x::Real, y::Real, width::Real, height::Real)
     xf, yf, wf, hf = Float32(x), Float32(y), Float32(width), Float32(height)
     ext = [Point2f(xf + p[1]*wf, yf + p[2]*hf) for p in glyph.exterior]
