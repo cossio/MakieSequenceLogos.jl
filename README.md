@@ -5,6 +5,8 @@
 
 A Julia package to plot [sequence logos](https://en.wikipedia.org/wiki/Sequence_logo) with [Makie](https://docs.makie.org/stable/).
 
+![Example DNA sequence logo showing nucleotide information content across aligned positions](assets/example_sequence_logo.png)
+
 MakieSequenceLogos.jl can:
 
 - build logos directly from aligned DNA, RNA, or protein sequences
