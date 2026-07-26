@@ -18,3 +18,9 @@ updates:
       all-julia-packages:
         patterns:
           - "*"
+    ignore:
+      # This package is developed here and shared across the workspace projects
+      # (test/, docs/, repl/). A compat bound pinning it to a released version
+      # conflicts with the in-development version in the root Project.toml and
+      # breaks resolution.
+      - dependency-name: "MakieSequenceLogos"
